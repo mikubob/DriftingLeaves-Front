@@ -29,6 +29,8 @@ import TableOfContents from '@/components/TableOfContents.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
+import { MarkdownHeadingIds } from '@/utils/markdownAnchors'
+import { useArticleAnchors } from '@/composables/useArticleAnchors'
 
 const route = useRoute()
 const visitorStore = useVisitorStore()
@@ -52,6 +54,9 @@ const liked = ref(false)
 const liking = ref(false)
 const readingProgress = ref(0)
 const articleContentRef = ref(null)
+const headingIds = new MarkdownHeadingIds()
+const { onContentRendered, onAnchorClick } =
+  useArticleAnchors(articleContentRef)
 
 let readingProgressFrame = 0
 
@@ -159,6 +164,7 @@ const loadArticle = async (slug) => {
     article.value = null
   } finally {
     loading.value = false
+    onContentRendered()
     nextTick(updateReadingProgress)
   }
 }
@@ -220,7 +226,10 @@ const validateField = (field) => {
       result = isValidEmailOrQq(commentForm.value.emailOrQq)
       break
     case 'captcha':
-      result = isValidCaptcha(commentForm.value.captchaAnswer, captcha.value.result)
+      result = isValidCaptcha(
+        commentForm.value.captchaAnswer,
+        captcha.value.result
+      )
       break
   }
   errors.value[field] = result.valid ? '' : result.msg
@@ -478,11 +487,17 @@ onUnmounted(() => {
             </div>
 
             <!-- 正文 -->
-            <div ref="articleContentRef" class="article-content">
+            <div
+              ref="articleContentRef"
+              class="article-content"
+              @click.capture="onAnchorClick"
+            >
               <MdPreview
                 v-if="hasMarkdown"
                 editorId="blog-article-preview"
                 :modelValue="article.contentMarkdown"
+                :md-heading-id="headingIds.getId"
+                @on-html-changed="onContentRendered"
                 previewTheme="github"
                 :theme="previewTheme"
                 codeTheme="atom"
@@ -592,11 +607,16 @@ onUnmounted(() => {
                   ref="commentTextareaRef"
                   v-model="commentForm.content"
                   placeholder="写下你的想法..."
-                  :class="['form-textarea', { 'form-textarea-error': errors.content }]"
+                  :class="[
+                    'form-textarea',
+                    { 'form-textarea-error': errors.content }
+                  ]"
                   rows="4"
                   @blur="validateField('content')"
                 />
-                <p v-if="errors.content" class="error-text">{{ errors.content }}</p>
+                <p v-if="errors.content" class="error-text">
+                  {{ errors.content }}
+                </p>
                 <div
                   class="char-counter-line"
                   :class="{ 'over-limit': contentLength > 2000 }"
@@ -611,11 +631,16 @@ onUnmounted(() => {
                     <input
                       v-model="commentForm.nickname"
                       placeholder="昵称 *"
-                      :class="['form-input', { 'form-input-error': errors.nickname }]"
+                      :class="[
+                        'form-input',
+                        { 'form-input-error': errors.nickname }
+                      ]"
                       @blur="validateField('nickname')"
                     />
                   </div>
-                  <p v-if="errors.nickname" class="error-text">{{ errors.nickname }}</p>
+                  <p v-if="errors.nickname" class="error-text">
+                    {{ errors.nickname }}
+                  </p>
                 </div>
                 <div class="form-field">
                   <div class="input-with-icon">
@@ -623,11 +648,16 @@ onUnmounted(() => {
                     <input
                       v-model="commentForm.emailOrQq"
                       placeholder="邮箱/QQ号"
-                      :class="['form-input', { 'form-input-error': errors.emailOrQq }]"
+                      :class="[
+                        'form-input',
+                        { 'form-input-error': errors.emailOrQq }
+                      ]"
                       @blur="validateField('emailOrQq')"
                     />
                   </div>
-                  <p v-if="errors.emailOrQq" class="error-text">{{ errors.emailOrQq }}</p>
+                  <p v-if="errors.emailOrQq" class="error-text">
+                    {{ errors.emailOrQq }}
+                  </p>
                 </div>
                 <div class="form-field">
                   <div
@@ -639,12 +669,22 @@ onUnmounted(() => {
                     <input
                       v-model="commentForm.captchaAnswer"
                       placeholder="验证码"
-                      :class="['form-input', { 'form-input-error': errors.captcha }]"
+                      :class="[
+                        'form-input',
+                        { 'form-input-error': errors.captcha }
+                      ]"
                       @focus="captchaFocus = true"
-                      @blur="() => { captchaFocus = false; validateField('captcha') }"
+                      @blur="
+                        () => {
+                          captchaFocus = false
+                          validateField('captcha')
+                        }
+                      "
                     />
                     <span
-                      v-show="(captchaHover || captchaFocus) && captcha.question"
+                      v-show="
+                        (captchaHover || captchaFocus) && captcha.question
+                      "
                       class="captcha-tip"
                     >
                       {{ captcha.question }}
@@ -656,7 +696,9 @@ onUnmounted(() => {
                       >↻</span
                     >
                   </div>
-                  <p v-if="errors.captcha" class="error-text">{{ errors.captcha }}</p>
+                  <p v-if="errors.captcha" class="error-text">
+                    {{ errors.captcha }}
+                  </p>
                 </div>
               </div>
               <div class="form-options">
@@ -1046,6 +1088,15 @@ onUnmounted(() => {
 
 .article-content {
   word-break: break-word;
+}
+
+.article-content :deep(h1),
+.article-content :deep(h2),
+.article-content :deep(h3),
+.article-content :deep(h4),
+.article-content :deep(h5),
+.article-content :deep(h6) {
+  scroll-margin-top: 90px;
 }
 
 .article-content :deep(.md-editor) {
